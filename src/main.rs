@@ -31,8 +31,8 @@ fn convert_to_ascii(grayscale_image: &DynamicImage) -> String {
 
 fn main() {
     // load the image using image reader
-    print!("\x1B[2J\x1B[1;1H");
     let img = ImageReader::open("images/red-moon.png").unwrap().decode().unwrap();
+    
     // resizing image
     let resized_image = resize_image(&img);
 
