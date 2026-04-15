@@ -1,6 +1,5 @@
 use std::fs::File;
 use std::io::Write;
-use std::vec;
 use image::{DynamicImage, ImageReader, GenericImageView};
 
 // steps in convering image to ascii
@@ -33,6 +32,7 @@ fn convert_to_ascii(grayscale_image: &DynamicImage) -> String {
             let idx = brightness as u32 * (ramp_len - 1) / 255;
             cur.push(ramp[idx as usize]);
         }
+        cur.push_str("\n");
         output.push_str(&cur);
     }
     output
