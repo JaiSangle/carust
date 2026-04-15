@@ -1,6 +1,10 @@
-use std::io::{stdout, Write};
+use std::io::{Write, stdout};
 use image::{DynamicImage, GenericImageView};
 use nokhwa::{Camera, pixel_format::RgbFormat, utils::{CameraFormat, CameraIndex, FrameFormat, RequestedFormat, RequestedFormatType, Resolution}};
+
+static RAMP: &str = " .:-=+*#%@";
+const RAMP_LEN: usize = RAMP.len();
+const GAMMA: f32 = 0.5_f32;
 
 fn resize_image(image: &DynamicImage) -> DynamicImage {
     // doing all this to preserve scale of image and not distorting it
@@ -16,23 +20,21 @@ fn convert_to_grayscale(image: &DynamicImage) -> DynamicImage {
     image.grayscale()
 }
 
-fn convert_to_ascii(grayscale_image: &DynamicImage) -> String {
+fn convert_to_ascii(grayscale_image: &DynamicImage, output: &mut String) {
+    output.clear();
     // mapping character to brightness
-    // TODO: use a better ramp and use gamma
-    let ramp: Vec<char> = " .:-=+*#%@".chars().collect();
-    let ramp_len = ramp.len() as u32;
-    let mut output = String::new();
+    // TODO: use a better ramp and use gamma=
     let (width, height) = grayscale_image.dimensions();
     for row in 0..height {
         for col in 0..width {
             let pixel = grayscale_image.get_pixel(col, row);
             let brightness = pixel[0];
-            let idx = brightness as u32 * (ramp_len - 1) / 255;
-            output.push(ramp[idx as usize]);
+            let adjusted = (brightness as f32 / 255.0).powf(GAMMA);
+            let idx = (adjusted * (RAMP_LEN - 1) as f32).round() as usize;
+            output.push(RAMP.as_bytes()[idx] as char);
         }
         output.push('\n');
     }
-    output
 }
 
 fn camera_init() -> Camera {
@@ -65,24 +67,31 @@ fn main() {
 
     print!("\x1B[2J");
 
-    // simulating video in terminal
-    loop {
-        // \x1B[1;1H moves cursor to the top left
-        print!("\x1B[1;1H");
-
-        let img = capture_image(&mut camera);
-
-        // resizing image
-        let resized_image = resize_image(&img);
-
-        // converting to grayscale
-        let grayscale_image = convert_to_grayscale(&resized_image);
-
-        // convert to ascii
-        let output = convert_to_ascii(&grayscale_image);
-        print!("{}",output);
-        stdout().flush().unwrap();
-        
-        std::thread::sleep(std::time::Duration::from_millis(100));
+    let start = std::time::Instant::now();
+    {
+        // simulating video in terminal
+        let mut output = String::new();
+        for _ in 0..100 {
+            // \x1B[1;1H moves cursor to the top left
+            print!("\x1B[1;1H");
+    
+            let img = capture_image(&mut camera);
+    
+            // resizing image
+            let resized_image = resize_image(&img);
+    
+            // converting to grayscale
+            let grayscale_image = convert_to_grayscale(&resized_image);
+    
+            // convert to ascii
+            convert_to_ascii(&grayscale_image, &mut output);
+            print!("{}",output);
+            stdout().flush().unwrap();
+            
+            std::thread::sleep(std::time::Duration::from_millis(30));
+        }
     }
+
+    let elapsed = start.elapsed();
+    println!("time taken: {:?}",elapsed);
 }
