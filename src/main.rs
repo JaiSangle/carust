@@ -23,12 +23,14 @@ fn convert_to_grayscale(image: &DynamicImage) -> DynamicImage {
 fn convert_to_ascii(grayscale_image: &DynamicImage, output: &mut String) {
     output.clear();
     // mapping character to brightness
-    // TODO: use a better ramp and use gamma=
+    // TODO: use a better ramp and use gamma
+    let gray = grayscale_image.to_luma8();
+    let buf = gray.as_raw();
     let (width, height) = grayscale_image.dimensions();
     for row in 0..height {
         for col in 0..width {
-            let pixel = grayscale_image.get_pixel(col, row);
-            let brightness = pixel[0];
+            let index = (row * width + col) as usize;
+            let brightness = buf[index];
             let adjusted = (brightness as f32 / 255.0).powf(GAMMA);
             let idx = (adjusted * (RAMP_LEN - 1) as f32).round() as usize;
             output.push(RAMP.as_bytes()[idx] as char);
@@ -74,7 +76,6 @@ fn main() {
         for _ in 0..100 {
             // \x1B[1;1H moves cursor to the top left
             print!("\x1B[1;1H");
-    
             let img = capture_image(&mut camera);
     
             // resizing image
