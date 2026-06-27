@@ -1,42 +1,59 @@
-use std::io::{Write, stdout};
 use image::{DynamicImage, GenericImageView};
 use nokhwa::{Camera, pixel_format::RgbFormat, utils::{CameraFormat, CameraIndex, FrameFormat, RequestedFormat, RequestedFormatType, Resolution}};
+use minifb::{Key, Window, WindowOptions};
 
-static RAMP: &str = " .:-=+*#%@";
-const RAMP_LEN: usize = RAMP.len();
-const GAMMA: f32 = 0.5_f32;
+struct App {
+    camera: Camera,
+    window: Window,
+    buffer: Vec<u32>,
+    width: usize,
+    height: usize
+}
+
+impl App {
+    // this is like a constructor but rust doesnt have them so we implemented ourselves
+    fn new() -> Self {
+        let mut camera = camera_init();
+
+        // we do this once to get dimensions first, we can avoid this by having hardcoded values
+        // but this will be necessary while taking images from files or so..
+        let img = capture_resized_image(&mut camera);
+
+        let (width, height) = img.dimensions();
+
+        let window = init_window(width as usize, height as usize);
+
+        let buffer = image_to_buffer(&img);
+
+        // return App
+        Self {
+            camera,
+            window,
+            buffer,
+            width: width as usize,
+            height: height as usize,
+        }
+    }
+    
+    fn run(&mut self) {
+        while self.window.is_open() && !self.window.is_key_down(Key::Escape) {
+            let img = capture_resized_image(&mut self.camera);
+
+            self.buffer = image_to_buffer(&img);
+
+            self.window.update_with_buffer(&self.buffer, self.width, self.height).unwrap();
+        }
+    }
+}
 
 fn resize_image(image: &DynamicImage) -> DynamicImage {
     // doing all this to preserve scale of image and not distorting it
     // OBS: 80 takes about half the time as compared to 100 and 120
     let (w,h) = image.dimensions();
     let aspect_ratio = w as f32 / h as f32;
-    let new_width = 80;
-    let new_height = (new_width as f32 / aspect_ratio / 2.0).round() as u32;
+    let new_width = 320;
+    let new_height = (new_width as f32 / aspect_ratio).round() as u32;
     image.resize(new_width, new_height, image::imageops::FilterType::Nearest)
-}
-
-fn convert_to_grayscale(image: &DynamicImage) -> DynamicImage {
-    image.grayscale()
-}
-
-fn convert_to_ascii(grayscale_image: &DynamicImage, output: &mut String) {
-    output.clear();
-    // mapping character to brightness
-    // TODO: use a better ramp and use gamma
-    let gray = grayscale_image.to_luma8();
-    let buf = gray.as_raw();
-    let (width, height) = grayscale_image.dimensions();
-    for row in 0..height {
-        for col in 0..width {
-            let index = (row * width + col) as usize;
-            let brightness = buf[index];
-            let adjusted = (brightness as f32 / 255.0).powf(GAMMA);
-            let idx = (adjusted * (RAMP_LEN - 1) as f32).round() as usize;
-            output.push(RAMP.as_bytes()[idx] as char);
-        }
-        output.push('\n');
-    }
 }
 
 fn camera_init() -> Camera {
@@ -62,37 +79,46 @@ fn capture_image(camera: &mut Camera) -> DynamicImage {
     )
 }
 
+fn capture_resized_image(camera: &mut Camera) -> DynamicImage {
+    let img = capture_image(camera);
+    resize_image(&img)
+}
+
+// opening a window which shows the captured frame in it
+// flow: capture image -> convert to rgba -> convert to u32 buffer -> use buffer update 
+fn init_window(width: usize, height: usize) -> Window {
+    Window::new(
+        "Test",
+        width,
+        height,
+        WindowOptions {
+            resize: true,
+            ..WindowOptions::default()
+        },
+    )
+    .expect("Unable to open window")
+}
+
+fn image_to_buffer(img: &DynamicImage) -> Vec<u32> {
+
+    // converting to rgba (0RGB, 32 bytes -> first byte is unused) [because minifb needs in u32 buffer]
+    let rgb_image = img.to_rgba8();
+
+    // rgba: each color is 8 bits
+    let buffer: Vec<u32> = rgb_image
+    .pixels()
+    .map(|pixel| {
+        let [r, g, b, _] = pixel.0;
+        ((r as u32) << 16)
+            | ((g as u32) << 8)
+            | (b as u32)
+    })
+    .collect();
+
+    buffer
+}
 
 fn main() {
-    // initialize the camera
-    let mut camera = camera_init();
-
-    print!("\x1B[2J");
-
-    let start = std::time::Instant::now();
-    {
-        // simulating video in terminal
-        let mut output = String::new();
-        for _ in 0..100 {
-            // \x1B[1;1H moves cursor to the top left
-            print!("\x1B[1;1H");
-            let img = capture_image(&mut camera);
-    
-            // resizing image
-            let resized_image = resize_image(&img);
-    
-            // converting to grayscale
-            let grayscale_image = convert_to_grayscale(&resized_image);
-    
-            // convert to ascii
-            convert_to_ascii(&grayscale_image, &mut output);
-            print!("{}",output);
-            stdout().flush().unwrap();
-            
-            std::thread::sleep(std::time::Duration::from_millis(30));
-        }
-    }
-
-    let elapsed = start.elapsed();
-    println!("time taken: {:?}",elapsed);
+    let mut app = App::new();
+    app.run();
 }
