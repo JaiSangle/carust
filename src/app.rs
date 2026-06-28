@@ -1,9 +1,8 @@
-use image::GenericImageView;
 use minifb::{Key, Window};
 use nokhwa::Camera;
 
-use crate::camera::{camera_init, capture_resized_image};
-use crate::renderer::{image_to_buffer, init_window};
+use crate::camera::{camera_init, capture_frame};
+use crate::renderer::{frame_to_buffer, init_window};
 
 pub struct App {
     camera: Camera,
@@ -20,29 +19,31 @@ impl App {
 
         // we do this once to get dimensions first, we can avoid this by having hardcoded values
         // but this will be necessary while taking images from files or so..
-        let img = capture_resized_image(&mut camera);
+        let frame = capture_frame(&mut camera);
 
-        let (width, height) = img.dimensions();
+        let width = frame.width as usize;
+        let height = frame.height as usize;
 
-        let window = init_window(width as usize, height as usize);
+        let window = init_window(width, height);
 
-        let buffer = image_to_buffer(&img);
+        let mut buffer = vec![0u32; height * width];
+        frame_to_buffer(&frame, &mut buffer);
 
         // return App
         Self {
             camera,
             window,
             buffer,
-            width: width as usize,
-            height: height as usize,
+            width: width,
+            height: height,
         }
     }
 
     pub fn run(&mut self) {
         while self.window.is_open() && !self.window.is_key_down(Key::Escape) {
-            let img = capture_resized_image(&mut self.camera);
+            let frame = capture_frame(&mut self.camera);
 
-            self.buffer = image_to_buffer(&img);
+            frame_to_buffer(&frame, &mut self.buffer);
 
             self.window
                 .update_with_buffer(&self.buffer, self.width, self.height)

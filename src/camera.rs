@@ -1,3 +1,4 @@
+use crate::frame::Frame;
 use image::{DynamicImage, GenericImageView};
 use nokhwa::{
     Camera,
@@ -31,12 +32,29 @@ pub fn camera_init() -> Camera {
     camera
 }
 
-pub fn capture_image(camera: &mut Camera) -> DynamicImage {
+fn capture_image(camera: &mut Camera) -> DynamicImage {
     let frame = camera.frame().unwrap();
     DynamicImage::ImageRgb8(frame.decode_image::<RgbFormat>().unwrap())
 }
 
-pub fn capture_resized_image(camera: &mut Camera) -> DynamicImage {
+fn capture_resized_image(camera: &mut Camera) -> DynamicImage {
     let img = capture_image(camera);
     resize_image(&img)
+}
+
+// finally we will convert the DynamicImage to Frame
+pub fn image_to_frame(image: &DynamicImage) -> Frame {
+    let (width, height) = image.dimensions();
+    let rgb = image.to_rgb8();
+    let pixels = rgb.into_raw();
+    Frame {
+        width,
+        height,
+        pixels,
+    }
+}
+
+pub fn capture_frame(camera: &mut Camera) -> Frame {
+    let img = capture_resized_image(camera);
+    image_to_frame(&img)
 }

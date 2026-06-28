@@ -1,4 +1,4 @@
-use image::DynamicImage;
+use crate::frame::Frame;
 use minifb::{Window, WindowOptions};
 
 // opening a window which shows the captured frame in it
@@ -16,18 +16,20 @@ pub fn init_window(width: usize, height: usize) -> Window {
     .expect("Unable to open window")
 }
 
-pub fn image_to_buffer(img: &DynamicImage) -> Vec<u32> {
+pub fn frame_to_buffer(frame: &Frame, buffer: &mut Vec<u32>) {
     // converting to rgba (0RGB, 32 bytes -> first byte is unused) [because minifb needs in u32 buffer]
-    let rgb_image = img.to_rgba8();
-
-    // rgba: each color is 8 bits
-    let buffer: Vec<u32> = rgb_image
-        .pixels()
-        .map(|pixel| {
-            let [r, g, b, _] = pixel.0;
-            ((r as u32) << 16) | ((g as u32) << 8) | (b as u32)
-        })
-        .collect();
-
-    buffer
+    // a buffer need u32 which is 0rgb
+    // we have r g b -> make a mask that represents 0rgb
+    // r should be shifted left by 16
+    // g should be shifted left by 8
+    // b should be shifted by 0
+    let mut i = 0;
+    while i < frame.pixels.len() {
+        let r = frame.pixels[i] as u32;
+        let g = frame.pixels[i + 1] as u32;
+        let b = frame.pixels[i + 2] as u32;
+        let mask: u32 = (r << 16) | (g << 8) | b;
+        buffer[i / 3] = mask;
+        i += 3;
+    }
 }
