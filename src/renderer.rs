@@ -33,3 +33,15 @@ pub fn frame_to_buffer(frame: &Frame, buffer: &mut Vec<u32>) {
         i += 3;
     }
 }
+
+pub fn render_frame(
+    frame: &Frame,
+    window: &mut Window,
+    buffer: &mut Vec<u32>,
+    width: usize,
+    height: usize,
+) {
+    frame_to_buffer(&frame, buffer);
+
+    window.update_with_buffer(&buffer, width, height).unwrap();
+}

@@ -8,7 +8,23 @@ use nokhwa::{
     },
 };
 
-pub fn resize_image(image: &DynamicImage) -> DynamicImage {
+pub struct CameraCapture {
+    camera: Camera,
+}
+
+impl CameraCapture {
+    pub fn new() -> Self {
+        let camera = camera_init();
+        CameraCapture { camera }
+    }
+
+    pub fn capture_frame(&mut self) -> Frame {
+        let img = capture_resized_image(&mut self.camera);
+        image_to_frame(&img)
+    }
+}
+
+fn resize_image(image: &DynamicImage) -> DynamicImage {
     // doing all this to preserve scale of image and not distorting it
     // OBS: 80 takes about half the time as compared to 100 and 120
     let (w, h) = image.dimensions();
@@ -18,7 +34,7 @@ pub fn resize_image(image: &DynamicImage) -> DynamicImage {
     image.resize(new_width, new_height, image::imageops::FilterType::Nearest)
 }
 
-pub fn camera_init() -> Camera {
+fn camera_init() -> Camera {
     // initialize the camera
     let index = CameraIndex::Index(0);
     let format = RequestedFormat::new::<RgbFormat>(RequestedFormatType::Exact(CameraFormat::new(
@@ -43,7 +59,7 @@ fn capture_resized_image(camera: &mut Camera) -> DynamicImage {
 }
 
 // finally we will convert the DynamicImage to Frame
-pub fn image_to_frame(image: &DynamicImage) -> Frame {
+fn image_to_frame(image: &DynamicImage) -> Frame {
     let (width, height) = image.dimensions();
     let rgb = image.to_rgb8();
     let pixels = rgb.into_raw();
@@ -52,9 +68,4 @@ pub fn image_to_frame(image: &DynamicImage) -> Frame {
         height,
         pixels,
     }
-}
-
-pub fn capture_frame(camera: &mut Camera) -> Frame {
-    let img = capture_resized_image(camera);
-    image_to_frame(&img)
 }
